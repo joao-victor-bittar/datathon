@@ -26,8 +26,8 @@ st.markdown("""
 @st.cache_data
 def load_and_process_data():
     """
-    Busca o arquivo Excel, mapeia e padroniza colunas com flexibilidade,
-    e consolida a base analítica do PEDE.
+    Busca o arquivo Excel e faz um mapeamento flexível baseado em palavras-chave 
+    para garantir a captura de Português, Matemática e Inglês.
     """
     BASE_DIR = Path(__file__).resolve().parent
     file_path = BASE_DIR / "BASE DE DADOS PEDE 2024 - DATATHON.xlsx"
@@ -43,77 +43,87 @@ def load_and_process_data():
 
     frames = []
 
-    # Mapas de padronização por aba (com alternativas para variações de nomes)
-    cols_2022 = {
-        'RA': 'RA', 'NOME': 'Nome', 'TURMA': 'Turma', 'FASE': 'Fase', 
-        'PEDRA': 'Pedra', 'PEDRA 2022': 'Pedra', 'PEDRA_2022': 'Pedra',
-        'INDE 2022': 'INDE', 'IAN 2022': 'IAN', 'IDA 2022': 'IDA', 'IEG 2022': 'IEG',
-        'IAA 2022': 'IAA', 'IPS 2022': 'IPS', 'IPV 2022': 'IPV',
-        'NOTA_PORT_2022': 'Nota_Port', 'NOTA_MAT_2022': 'Nota_Mat', 'NOTA_ING_2022': 'Nota_Ing',
-        'DEFASAGEM_2022': 'Defasagem', 'PONTO_VIRADA_2022': 'Atingiu_PV'
-    }
-
-    cols_2023 = {
-        'RA': 'RA', 'NOME': 'Nome', 'TURMA': 'Turma', 'FASE': 'Fase', 
-        'PEDRA': 'Pedra', 'PEDRA 2023': 'Pedra', 'PEDRA_2023': 'Pedra', 'PEDRA 23': 'Pedra',
-        'INDE 2023': 'INDE', 'IAN 2023': 'IAN', 'IDA 2023': 'IDA', 'IEG 2023': 'IEG',
-        'IAA 2023': 'IAA', 'IPS 2023': 'IPS', 'IPP 2023': 'IPP', 'IPV 2023': 'IPV',
-        'NOTA_PORT_2023': 'Nota_Port', 'NOTA_MAT_2023': 'Nota_Mat', 'NOTA_ING_2023': 'Nota_Ing',
-        'DEFASAGEM_2023': 'Defasagem'
-    }
-
-    cols_2024 = {
-        'RA': 'RA', 'NOME': 'Nome', 'TURMA': 'Turma', 'FASE': 'Fase', 
-        'PEDRA': 'Pedra', 'PEDRA 2024': 'Pedra', 'PEDRA_2024': 'Pedra', 'PEDRA 24': 'Pedra',
-        'INDE 2024': 'INDE', 'IAN 2024': 'IAN', 'IDA 2024': 'IDA', 'IEG 2024': 'IEG',
-        'IAA 2024': 'IAA', 'IPS 2024': 'IPS', 'IPP 2024': 'IPP', 'IPV 2024': 'IPV',
-        'NOTA_PORT_2024': 'Nota_Port', 'NOTA_MAT_2024': 'Nota_Mat', 'NOTA_ING_2024': 'Nota_Ing',
-        'DEFASAGEM_2024': 'Defasagem'
-    }
-
+    # Dicionário dinâmico de abas e seus respectivos anos
     map_years = {
-        'PEDE2022': (2022, cols_2022),
-        'PEDE2023': (2023, cols_2023),
-        'PEDE2024': (2024, cols_2024)
+        'PEDE2022': 2022,
+        'PEDE2023': 2023,
+        'PEDE2024': 2024
     }
 
-    target_columns = [
-        'RA', 'Nome', 'Turma', 'Fase', 'Pedra', 'Ano', 'INDE', 'IAN', 'IDA', 
-        'IEG', 'IAA', 'IPS', 'IPP', 'IPV', 'Nota_Port', 'Nota_Mat', 'Nota_Ing', 
-        'Defasagem', 'Atingiu_PV'
-    ]
-
-    for sheet, (year, col_map) in map_years.items():
+    for sheet, year in map_years.items():
         if sheet in xls.sheet_names:
             df_temp = pd.read_excel(xls, sheet_name=sheet)
-            
-            # Converte todos os nomes de colunas para maiúsculas e sem espaços extras para busca
             df_temp.columns = df_temp.columns.astype(str).str.strip()
             
-            # Renomeia com base no dicionário
-            df_temp = df_temp.rename(columns=col_map)
+            # Mapeamento dinâmico inteligente por palavra-chave na coluna
+            rename_dict = {}
+            for col in df_temp.columns:
+                col_upper = col.upper()
+                
+                # Identificação de Português
+                if 'PORT' in col_upper or 'POR' in col_upper:
+                    rename_dict[col] = 'Nota_Port'
+                # Identificação de Matemática
+                elif 'MAT' in col_upper:
+                    rename_dict[col] = 'Nota_Mat'
+                # Identificação de Inglês
+                elif 'ING' in col_upper:
+                    rename_dict[col] = 'Nota_Ing'
+                # Identificação do Ponto de Virada
+                elif 'PONTO' in col_upper or 'VIRADA' in col_upper:
+                    rename_dict[col] = 'Atingiu_PV'
+                # Identificação da Defasagem
+                elif 'DEFASAGEM' in col_upper:
+                    rename_dict[col] = 'Defasagem'
+                # Identificação da Pedra
+                elif 'PEDRA' in col_upper:
+                    rename_dict[col] = 'Pedra'
+                # Identificação da Fase
+                elif 'FASE' in col_upper:
+                    rename_dict[col] = 'Fase'
+                # Identificação do INDE
+                elif 'INDE' in col_upper:
+                    rename_dict[col] = 'INDE'
+                # Identificação do IDA
+                elif 'IDA' in col_upper and '2' in col_upper: # IDA 2022, IDA 2023, etc
+                    rename_dict[col] = 'IDA'
+                elif col_upper == 'IDA':
+                    rename_dict[col] = 'IDA'
+                # Identificação do IEG
+                elif 'IEG' in col_upper:
+                    rename_dict[col] = 'IEG'
+                # Identificação do IPV
+                elif 'IPV' in col_upper:
+                    rename_dict[col] = 'IPV'
+                # Identificação do IAN
+                elif 'IAN' in col_upper:
+                    rename_dict[col] = 'IAN'
+
+            df_temp = df_temp.rename(columns=rename_dict)
             df_temp['Ano'] = year
 
-            # Garante a existência de todas as colunas esperadas
-            for col in target_columns:
-                if col not in df_temp.columns:
-                    df_temp[col] = None
+            # Garantir colunas essenciais
+            target_cols = ['RA', 'Nome', 'Turma', 'Fase', 'Pedra', 'Ano', 'INDE', 'IAN', 'IDA', 
+                           'IEG', 'IAA', 'IPS', 'IPP', 'IPV', 'Nota_Port', 'Nota_Mat', 'Nota_Ing', 
+                           'Defasagem', 'Atingiu_PV']
+            
+            for c in target_cols:
+                if c not in df_temp.columns:
+                    df_temp[c] = None
 
-            df_temp = df_temp[target_columns]
-            frames.append(df_temp)
+            frames.append(df_temp[target_cols])
 
     df_pede = pd.concat(frames, ignore_index=True)
 
-    # Tratamento de colunas de filtro
+    # Limpeza de texto
     df_pede['Fase'] = df_pede['Fase'].fillna('Não Informado').astype(str).str.strip()
     df_pede['Pedra'] = df_pede['Pedra'].fillna('Não Informado').astype(str).str.strip()
 
-    # Conversão de tipos numéricos
+    # Conversão explícita de colunas numéricas
     numeric_cols = ['INDE', 'IAN', 'IDA', 'IEG', 'IAA', 'IPS', 'IPP', 'IPV', 
                     'Nota_Port', 'Nota_Mat', 'Nota_Ing', 'Defasagem']
     for c in numeric_cols:
-        if c in df_pede.columns:
-            df_pede[c] = pd.to_numeric(df_pede[c], errors='coerce')
+        df_pede[c] = pd.to_numeric(df_pede[c], errors='coerce')
 
     # Classificação da Defasagem (IAN)
     def classificar_defasagem(val):
@@ -274,17 +284,24 @@ with tab_desempenho:
 
     with col_d1:
         df_disc = df_filtered.groupby('Ano')[['Nota_Port', 'Nota_Mat', 'Nota_Ing']].mean().reset_index()
-        fig_disc = px.bar(
-            df_disc, 
-            x='Ano', 
-            y=['Nota_Port', 'Nota_Mat', 'Nota_Ing'],
-            barmode='group',
-            title="Evolução das Notas Médias por Disciplina",
-            labels={'value': 'Nota Média', 'variable': 'Disciplina'},
-            color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c']
-        )
-        fig_disc.update_xaxes(dtick=1)
-        st.plotly_chart(fig_disc, use_container_width=True)
+        
+        # Filtra apenas colunas que possuem dados válidos
+        cols_presentes = [c for c in ['Nota_Port', 'Nota_Mat', 'Nota_Ing'] if df_disc[c].notna().any()]
+        
+        if cols_presentes:
+            fig_disc = px.bar(
+                df_disc, 
+                x='Ano', 
+                y=cols_presentes,
+                barmode='group',
+                title="Evolução das Notas Médias por Disciplina",
+                labels={'value': 'Nota Média', 'variable': 'Disciplina'},
+                color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c']
+            )
+            fig_disc.update_xaxes(dtick=1)
+            st.plotly_chart(fig_disc, use_container_width=True)
+        else:
+            st.warning("Não foram encontradas notas registradas para as disciplinas nos anos/filtros selecionados.")
 
     with col_d2:
         df_fase_ida = df_filtered.groupby('Fase')['IDA'].mean().reset_index()
