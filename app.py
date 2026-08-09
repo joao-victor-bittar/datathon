@@ -25,10 +25,6 @@ st.markdown("""
 # ==============================================================================
 @st.cache_data
 def load_and_process_data():
-    """
-    Busca o arquivo Excel e faz um mapeamento flexível baseado em palavras-chave 
-    para garantir a captura de Português, Matemática e Inglês.
-    """
     BASE_DIR = Path(__file__).resolve().parent
     file_path = BASE_DIR / "BASE DE DADOS PEDE 2024 - DATATHON.xlsx"
     
@@ -43,7 +39,6 @@ def load_and_process_data():
 
     frames = []
 
-    # Dicionário dinâmico de abas e seus respectivos anos
     map_years = {
         'PEDE2022': 2022,
         'PEDE2023': 2023,
@@ -55,54 +50,57 @@ def load_and_process_data():
             df_temp = pd.read_excel(xls, sheet_name=sheet)
             df_temp.columns = df_temp.columns.astype(str).str.strip()
             
-            # Mapeamento dinâmico inteligente por palavra-chave na coluna
+            # Conjunto para rastrear alvos já mapeados e evitar colunas duplicadas
+            mapped_targets = set()
             rename_dict = {}
+
             for col in df_temp.columns:
                 col_upper = col.upper()
-                
-                # Identificação de Português
-                if 'PORT' in col_upper or 'POR' in col_upper:
+
+                # Atribuição por palavra-chave sem duplicar alvos
+                if ('PORT' in col_upper or 'POR' in col_upper) and 'Nota_Port' not in mapped_targets:
                     rename_dict[col] = 'Nota_Port'
-                # Identificação de Matemática
-                elif 'MAT' in col_upper:
+                    mapped_targets.add('Nota_Port')
+                elif 'MAT' in col_upper and 'Nota_Mat' not in mapped_targets:
                     rename_dict[col] = 'Nota_Mat'
-                # Identificação de Inglês
-                elif 'ING' in col_upper:
+                    mapped_targets.add('Nota_Mat')
+                elif 'ING' in col_upper and 'Nota_Ing' not in mapped_targets:
                     rename_dict[col] = 'Nota_Ing'
-                # Identificação do Ponto de Virada
-                elif 'PONTO' in col_upper or 'VIRADA' in col_upper:
+                    mapped_targets.add('Nota_Ing')
+                elif ('PONTO' in col_upper or 'VIRADA' in col_upper) and 'Atingiu_PV' not in mapped_targets:
                     rename_dict[col] = 'Atingiu_PV'
-                # Identificação da Defasagem
-                elif 'DEFASAGEM' in col_upper:
+                    mapped_targets.add('Atingiu_PV')
+                elif 'DEFASAGEM' in col_upper and 'Defasagem' not in mapped_targets:
                     rename_dict[col] = 'Defasagem'
-                # Identificação da Pedra
-                elif 'PEDRA' in col_upper:
+                    mapped_targets.add('Defasagem')
+                elif 'PEDRA' in col_upper and 'Pedra' not in mapped_targets:
                     rename_dict[col] = 'Pedra'
-                # Identificação da Fase
-                elif 'FASE' in col_upper:
+                    mapped_targets.add('Pedra')
+                elif 'FASE' in col_upper and 'Fase' not in mapped_targets:
                     rename_dict[col] = 'Fase'
-                # Identificação do INDE
-                elif 'INDE' in col_upper:
+                    mapped_targets.add('Fase')
+                elif 'INDE' in col_upper and 'INDE' not in mapped_targets:
                     rename_dict[col] = 'INDE'
-                # Identificação do IDA
-                elif 'IDA' in col_upper and '2' in col_upper: # IDA 2022, IDA 2023, etc
+                    mapped_targets.add('INDE')
+                elif 'IDA' in col_upper and 'IDA' not in mapped_targets:
                     rename_dict[col] = 'IDA'
-                elif col_upper == 'IDA':
-                    rename_dict[col] = 'IDA'
-                # Identificação do IEG
-                elif 'IEG' in col_upper:
+                    mapped_targets.add('IDA')
+                elif 'IEG' in col_upper and 'IEG' not in mapped_targets:
                     rename_dict[col] = 'IEG'
-                # Identificação do IPV
-                elif 'IPV' in col_upper:
+                    mapped_targets.add('IEG')
+                elif 'IPV' in col_upper and 'IPV' not in mapped_targets:
                     rename_dict[col] = 'IPV'
-                # Identificação do IAN
-                elif 'IAN' in col_upper:
+                    mapped_targets.add('IPV')
+                elif 'IAN' in col_upper and 'IAN' not in mapped_targets:
                     rename_dict[col] = 'IAN'
+                    mapped_targets.add('IAN')
 
             df_temp = df_temp.rename(columns=rename_dict)
             df_temp['Ano'] = year
 
-            # Garantir colunas essenciais
+            # Elimina qualquer eventual duplicata de coluna existente
+            df_temp = df_temp.loc[:, ~df_temp.columns.duplicated()]
+
             target_cols = ['RA', 'Nome', 'Turma', 'Fase', 'Pedra', 'Ano', 'INDE', 'IAN', 'IDA', 
                            'IEG', 'IAA', 'IPS', 'IPP', 'IPV', 'Nota_Port', 'Nota_Mat', 'Nota_Ing', 
                            'Defasagem', 'Atingiu_PV']
@@ -284,8 +282,6 @@ with tab_desempenho:
 
     with col_d1:
         df_disc = df_filtered.groupby('Ano')[['Nota_Port', 'Nota_Mat', 'Nota_Ing']].mean().reset_index()
-        
-        # Filtra apenas colunas que possuem dados válidos
         cols_presentes = [c for c in ['Nota_Port', 'Nota_Mat', 'Nota_Ing'] if df_disc[c].notna().any()]
         
         if cols_presentes:
