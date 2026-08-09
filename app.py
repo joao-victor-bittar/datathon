@@ -50,24 +50,13 @@ def load_and_process_data():
             df_temp = pd.read_excel(xls, sheet_name=sheet)
             df_temp.columns = df_temp.columns.astype(str).str.strip()
             
-            # Conjunto para rastrear alvos já mapeados e evitar colunas duplicadas
             mapped_targets = set()
             rename_dict = {}
 
             for col in df_temp.columns:
                 col_upper = col.upper()
 
-                # Atribuição por palavra-chave sem duplicar alvos
-                if ('PORT' in col_upper or 'POR' in col_upper) and 'Nota_Port' not in mapped_targets:
-                    rename_dict[col] = 'Nota_Port'
-                    mapped_targets.add('Nota_Port')
-                elif 'MAT' in col_upper and 'Nota_Mat' not in mapped_targets:
-                    rename_dict[col] = 'Nota_Mat'
-                    mapped_targets.add('Nota_Mat')
-                elif 'ING' in col_upper and 'Nota_Ing' not in mapped_targets:
-                    rename_dict[col] = 'Nota_Ing'
-                    mapped_targets.add('Nota_Ing')
-                elif ('PONTO' in col_upper or 'VIRADA' in col_upper) and 'Atingiu_PV' not in mapped_targets:
+                if ('PONTO' in col_upper or 'VIRADA' in col_upper) and 'Atingiu_PV' not in mapped_targets:
                     rename_dict[col] = 'Atingiu_PV'
                     mapped_targets.add('Atingiu_PV')
                 elif 'DEFASAGEM' in col_upper and 'Defasagem' not in mapped_targets:
@@ -98,12 +87,10 @@ def load_and_process_data():
             df_temp = df_temp.rename(columns=rename_dict)
             df_temp['Ano'] = year
 
-            # Elimina qualquer eventual duplicata de coluna existente
             df_temp = df_temp.loc[:, ~df_temp.columns.duplicated()]
 
             target_cols = ['RA', 'Nome', 'Turma', 'Fase', 'Pedra', 'Ano', 'INDE', 'IAN', 'IDA', 
-                           'IEG', 'IAA', 'IPS', 'IPP', 'IPV', 'Nota_Port', 'Nota_Mat', 'Nota_Ing', 
-                           'Defasagem', 'Atingiu_PV']
+                           'IEG', 'IAA', 'IPS', 'IPP', 'IPV', 'Defasagem', 'Atingiu_PV']
             
             for c in target_cols:
                 if c not in df_temp.columns:
@@ -113,17 +100,13 @@ def load_and_process_data():
 
     df_pede = pd.concat(frames, ignore_index=True)
 
-    # Limpeza de texto
     df_pede['Fase'] = df_pede['Fase'].fillna('Não Informado').astype(str).str.strip()
     df_pede['Pedra'] = df_pede['Pedra'].fillna('Não Informado').astype(str).str.strip()
 
-    # Conversão explícita de colunas numéricas
-    numeric_cols = ['INDE', 'IAN', 'IDA', 'IEG', 'IAA', 'IPS', 'IPP', 'IPV', 
-                    'Nota_Port', 'Nota_Mat', 'Nota_Ing', 'Defasagem']
+    numeric_cols = ['INDE', 'IAN', 'IDA', 'IEG', 'IAA', 'IPS', 'IPP', 'IPV', 'Defasagem']
     for c in numeric_cols:
         df_pede[c] = pd.to_numeric(df_pede[c], errors='coerce')
 
-    # Classificação da Defasagem (IAN)
     def classificar_defasagem(val):
         if pd.isna(val): return "Sem Informação"
         if val <= -3: return "Defasagem Severa (≤ -3)"
@@ -135,7 +118,6 @@ def load_and_process_data():
     
     return df_pede
 
-# Executa carregamento
 df = load_and_process_data()
 
 # ==============================================================================
@@ -276,41 +258,19 @@ with tab_defasagem:
 # ABA 3: DESEMPENHO ACADÊMICO (IDA)
 # ------------------------------------------------------------------------------
 with tab_desempenho:
-    st.subheader("Desempenho por Disciplina e Curva de Transição por Fase")
+    st.subheader("Análise de Transição e Desempenho Acadêmico por Fase")
     
-    col_d1, col_d2 = st.columns(2)
-
-    with col_d1:
-        df_disc = df_filtered.groupby('Ano')[['Nota_Port', 'Nota_Mat', 'Nota_Ing']].mean().reset_index()
-        cols_presentes = [c for c in ['Nota_Port', 'Nota_Mat', 'Nota_Ing'] if df_disc[c].notna().any()]
-        
-        if cols_presentes:
-            fig_disc = px.bar(
-                df_disc, 
-                x='Ano', 
-                y=cols_presentes,
-                barmode='group',
-                title="Evolução das Notas Médias por Disciplina",
-                labels={'value': 'Nota Média', 'variable': 'Disciplina'},
-                color_discrete_sequence=['#1f77b4', '#ff7f0e', '#2ca02c']
-            )
-            fig_disc.update_xaxes(dtick=1)
-            st.plotly_chart(fig_disc, use_container_width=True)
-        else:
-            st.warning("Não foram encontradas notas registradas para as disciplinas nos anos/filtros selecionados.")
-
-    with col_d2:
-        df_fase_ida = df_filtered.groupby('Fase')['IDA'].mean().reset_index()
-        fig_curva = px.line(
-            df_fase_ida, 
-            x='Fase', 
-            y='IDA', 
-            markers=True,
-            title="Média de IDA por Fase (Curva em U nas Fases Intermediárias)",
-            labels={'IDA': 'Média IDA'}
-        )
-        fig_curva.update_traces(line_color='#e74c3c', line_width=3)
-        st.plotly_chart(fig_curva, use_container_width=True)
+    df_fase_ida = df_filtered.groupby('Fase')['IDA'].mean().reset_index()
+    fig_curva = px.line(
+        df_fase_ida, 
+        x='Fase', 
+        y='IDA', 
+        markers=True,
+        title="Média do Índice Acadêmico (IDA) por Fase Pedagógica",
+        labels={'IDA': 'Média IDA', 'Fase': 'Fase Pedagógica'}
+    )
+    fig_curva.update_traces(line_color='#e74c3c', line_width=3)
+    st.plotly_chart(fig_curva, use_container_width=True)
 
 # ------------------------------------------------------------------------------
 # ABA 4: ENGAJAMENTO & PONTO DE VIRADA
