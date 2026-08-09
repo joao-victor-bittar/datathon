@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import os
 from pathlib import Path
 
 # ==============================================================================
@@ -19,6 +18,19 @@ st.markdown("""
     .main .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
     </style>
 """, unsafe_allow_html=True)
+
+# Lista oficial e ordenada das fases conforme a estrutura da Passos Mágicos
+FASES_OFICIAIS = [
+    'Alfa', 
+    'Fase 1', 
+    'Fase 2', 
+    'Fase 3', 
+    'Fase 4', 
+    'Fase 5', 
+    'Fase 6', 
+    'Fase 7', 
+    'Fase 8'
+]
 
 # ==============================================================================
 # 2. PIPELINE DE CARREGAMENTO E TRATAMENTO DOS DADOS (CACHED)
@@ -100,7 +112,28 @@ def load_and_process_data():
 
     df_pede = pd.concat(frames, ignore_index=True)
 
-    df_pede['Fase'] = df_pede['Fase'].fillna('Não Informado').astype(str).str.strip()
+    # Padronização e normalização da coluna 'Fase'
+    df_pede['Fase'] = df_pede['Fase'].astype(str).str.strip()
+    
+    # Mapeamento para garantir formato padronizado ("Alfa", "Fase 1", "Fase 2", etc.)
+    def padronizar_fase(fase_str):
+        f = fase_str.lower()
+        if 'alfa' in f or f == '0':
+            return 'Alfa'
+        for i in range(1, 9):
+            if f == str(i) or f == f'fase {i}' or f == f'fase_{i}':
+                return f'Fase {i}'
+        return fase_str
+
+    df_pede['Fase'] = df_pede['Fase'].apply(padronizar_fase)
+
+    # Filtrar estritamente apenas as Fases Oficiais (Alfa até Fase 8)
+    df_pede = df_pede[df_pede['Fase'].isin(FASES_OFICIAIS)].copy()
+
+    # Converter coluna 'Fase' para Categórica para manter a ordem lógica (Alfa -> Fase 1 -> ... -> Fase 8)
+    df_pede['Fase'] = pd.Categorical(df_pede['Fase'], categories=FASES_OFICIAIS, ordered=True)
+
+    # Limpeza de Pedra
     df_pede['Pedra'] = df_pede['Pedra'].fillna('Não Informado').astype(str).str.strip()
 
     numeric_cols = ['INDE', 'IAN', 'IDA', 'IEG', 'IAA', 'IPS', 'IPP', 'IPV', 'Defasagem']
@@ -129,7 +162,8 @@ st.sidebar.title("Filtros Interativos")
 anos_disponiveis = sorted(df['Ano'].unique())
 selected_years = st.sidebar.multiselect("Anos Letivos", anos_disponiveis, default=anos_disponiveis)
 
-fases_disponiveis = sorted([f for f in df['Fase'].unique() if f not in ['', 'nan', 'None']], key=str)
+# Garante que as fases fiquem ordenadas do Alfa ao 8 na sidebar
+fases_disponiveis = [f for f in FASES_OFICIAIS if f in df['Fase'].unique()]
 selected_fases = st.sidebar.multiselect("Fases Pedagógicas", fases_disponiveis, default=fases_disponiveis)
 
 pedras_disponiveis = sorted([p for p in df['Pedra'].unique() if p not in ['', 'nan', 'None']], key=str)
@@ -222,8 +256,9 @@ with tab_visao_geral:
             x='Fase', 
             color='Ano', 
             barmode='group',
-            title="Distribuição por Fase Pedagógica",
-            color_discrete_sequence=px.colors.qualitative.Safe
+            title="Distribuição por Fase Pedagógica (Alfa a Fase 8)",
+            color_discrete_sequence=px.colors.qualitative.Safe,
+            category_orders={'Fase': FASES_OFICIAIS}
         )
         st.plotly_chart(fig_fase, use_container_width=True)
 
@@ -260,14 +295,15 @@ with tab_defasagem:
 with tab_desempenho:
     st.subheader("Análise de Transição e Desempenho Acadêmico por Fase")
     
-    df_fase_ida = df_filtered.groupby('Fase')['IDA'].mean().reset_index()
+    df_fase_ida = df_filtered.groupby('Fase', observed=False)['IDA'].mean().reset_index()
     fig_curva = px.line(
         df_fase_ida, 
         x='Fase', 
         y='IDA', 
         markers=True,
-        title="Média do Índice Acadêmico (IDA) por Fase Pedagógica",
-        labels={'IDA': 'Média IDA', 'Fase': 'Fase Pedagógica'}
+        title="Média do Índice Acadêmico (IDA) por Fase Pedagógica (Alfa até Fase 8)",
+        labels={'IDA': 'Média IDA', 'Fase': 'Fase Pedagógica'},
+        category_orders={'Fase': FASES_OFICIAIS}
     )
     fig_curva.update_traces(line_color='#e74c3c', line_width=3)
     st.plotly_chart(fig_curva, use_container_width=True)
